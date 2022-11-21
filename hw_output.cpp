@@ -530,6 +530,7 @@ static int hw_output_set_mode(struct hw_output_device* dev, int dpy, const char*
                     &info.screen_info[slot].resolution.vsync_end, &info.screen_info[slot].resolution.vtotal,
                     &info.screen_info[slot].resolution.flags, &info.screen_info[slot].resolution.clock);
            info.screen_info[slot].resolution.vrefresh = (int)vfresh;
+           info.screen_info[slot].feature^= RESOLUTION_AUTO;
         } else {
             info.screen_info[slot].feature|= RESOLUTION_AUTO;
             memset(&info.screen_info[slot].resolution, 0, sizeof(info.screen_info[slot].resolution));
