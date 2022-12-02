@@ -166,7 +166,18 @@ static std::string getPropertySuffix(hw_output_private_t *priv, std::string head
             suffix += std::to_string(id);
         }
     } else {
-        if (dpy == HWC_DISPLAY_PRIMARY)
+        std::string propertyStr = "vendor.hwc.device.primary";
+        char mainProperty[100];
+        property_get(propertyStr.c_str(), mainProperty, "");
+        ALOGE("mainProperty = %s\n", mainProperty);
+        if ((conn->get_type() == DRM_MODE_CONNECTOR_HDMIA && strstr(mainProperty, "HDMI-A"))
+            || (conn->get_type() == DRM_MODE_CONNECTOR_HDMIB && strstr(mainProperty, "HDMI-B"))
+            || (conn->get_type() == DRM_MODE_CONNECTOR_TV && strstr(mainProperty, "TV"))
+            || (conn->get_type() == DRM_MODE_CONNECTOR_VGA && strstr(mainProperty, "VGA"))
+            || (conn->get_type() == DRM_MODE_CONNECTOR_DisplayPort && strstr(mainProperty, "DP"))
+            || (conn->get_type() == DRM_MODE_CONNECTOR_eDP && strstr(mainProperty, "eDP"))
+            || (conn->get_type() == DRM_MODE_CONNECTOR_VIRTUAL && strstr(mainProperty, "Virtual"))
+            || (conn->get_type() == DRM_MODE_CONNECTOR_DSI && strstr(mainProperty, "DSI")))
             suffix += "main";
         else
             suffix += "aux";
@@ -470,12 +481,14 @@ static int hw_output_initialize(struct hw_output_device* dev, void* data)
             for (auto &conn : priv->drm_->connectors())
                 mGlobalConns.insert(std::make_pair(id++, conn.get()));
         } else {
-            int id=1;
+            int id=0;
             for (auto &conn : priv->drm_->connectors()) {
-                if (conn->possible_displays() & HWC_DISPLAY_PRIMARY_BIT)
+                // 同Hwc2相同处理方式，不区分主副屏
+                mGlobalConns.insert(std::make_pair(id++, conn.get()));
+                /* if (conn->possible_displays() & HWC_DISPLAY_PRIMARY_BIT)
                     mGlobalConns.insert(std::make_pair(HWC_DISPLAY_PRIMARY, conn.get()));
                 else
-                    mGlobalConns.insert(std::make_pair(id++, conn.get()));
+                    mGlobalConns.insert(std::make_pair(id++, conn.get())); */
             }
         }
         priv->mBaseParmeter->set_drm_connectors(mGlobalConns);
@@ -483,7 +496,7 @@ static int hw_output_initialize(struct hw_output_device* dev, void* data)
         if (priv->primary == NULL) {
             for (auto &conn : priv->drm_->connectors()) {
                 if ((conn->possible_displays() & HWC_DISPLAY_PRIMARY_BIT)) {
-                    //mGlobalConns[HWC_DISPLAY_PRIMARY] = conn.get();
+                    // mGlobalConns[HWC_DISPLAY_PRIMARY] = conn.get();
                 }
                 if ((conn->possible_displays() & HWC_DISPLAY_EXTERNAL_BIT) && conn->state() == DRM_MODE_CONNECTED) {
                     priv->drm_->SetExtendDisplay(conn.get());
@@ -825,11 +838,7 @@ static int hw_output_get_cur_color_mode(struct hw_output_device* dev, int dpy, c
     std::string propertyStr;
     char colorMode[PROPERTY_VALUE_MAX];
 
-    int len = 0;
-    uint64_t color_depth = 0;
-    uint64_t color_format = 0;
-    char color_format_str[32];
-    char color_depth_str[32];
+    int len=0;
 
     propertyStr = getPropertySuffix(priv, "persist.vendor.color.", dpy);
     len = property_get(propertyStr.c_str(), colorMode, NULL);
@@ -841,53 +850,10 @@ static int hw_output_get_cur_color_mode(struct hw_output_device* dev, int dpy, c
         if (dispInfo.screen_info[slot].depthc == Automatic &&
                 dispInfo.screen_info[slot].format == output_ycbcr_high_subsampling)
             sprintf(colorMode, "%s", "Auto");
-    }
-
-    if (mCurConnector != NULL) {
-        if(mCurConnector->color_depth_property().id()) {
-            mCurConnector->color_depth_property().value(&color_depth);
         }
-        if(mCurConnector->color_format_property().id()) {
-            mCurConnector->color_format_property().value(&color_format);
-        }
-        switch (color_depth) {
-            case AUTOMATIC:
-                sprintf(color_depth_str, "Auto");
-                break;
-            case DEPTH_18BIT:
-                sprintf(color_depth_str, "6bit");
-                break;
-            case DEPTH_24BIT:
-                sprintf(color_depth_str, "8bit");
-                break;
-            case DEPTH_30BIT:
-                sprintf(color_depth_str, "10bit");
-                break;
-        }
-        switch (color_format) {
-            case RGB:
-                sprintf(color_format_str, "RGB");
-                break;
-            case YCBCR444:
-                sprintf(color_format_str, "YCBCR444");
-                break;
-            case YCBCR422:
-                sprintf(color_format_str, "YCBCR422");
-                break;
-            case YCBCR420:
-                sprintf(color_format_str, "YCBCR420");
-                break;
-        }
-        if(!strcmp(color_depth_str, "Auto")) {
-            sprintf(colorMode, "%s", color_depth_str);
-        } else {
-            sprintf(colorMode, "%s-%s", color_format_str, color_depth_str);
-        }
-        ALOGD("hw_output_get_cur_color_mode: color_depth=%lu, color_format=%lu, color_depth=%s, color_format=%s curColorMode = %s", (unsigned long)color_depth, (unsigned long)color_format, color_depth_str, color_format_str, colorMode);
-    }
 
     sprintf(curColorMode, "%s", colorMode);
-    ALOGD("nativeGetCurCorlorMode: colorMode=%s", curColorMode);
+    ALOGD("nativeGetCurCorlorMode: colorMode=%s", colorMode);
     return 0;
 }
 

@@ -337,9 +337,54 @@ int BaseParameterV1::get_overscan_info(unsigned int connector_type, unsigned int
 
 int BaseParameterV1::set_overscan_info(unsigned int connector_type, unsigned int connector_id, struct overscan_info *overscan_info)
 {
-    UN_USED(connector_type);
-    UN_USED(connector_id);
-    UN_USED(overscan_info);
+    if (!hasInitial) {
+        ALOGW("baseparamter hasInitial false");
+        return -EINVAL;
+    }
+
+    int file;
+    int offset = 0;
+    const char *filepath = GetBaseparameterFile();
+
+    if (!mBaseParameterInfos || !filepath) {
+        ALOGD("hw_output: saveConfig filepath is NULL mBaseParameterInfo=%p*********", mBaseParameterInfos);
+        sync();
+        return -ENOENT;
+    }
+
+    file = open(filepath, O_RDWR);
+    if (file < 0) {
+        ALOGW("base paramter file can not be opened");
+        sync();
+        return -EIO;
+    }
+
+    struct disp_info_v1* info_v1;
+    std::string propertyStr;
+    char mainProperty[100];
+    propertyStr = "vendor.hwc.device.primary";
+    property_get(propertyStr.c_str(), mainProperty, "");
+    ALOGD("mainProperty = %s , connector_id = %d\n", mainProperty, connector_id);
+    if ((connector_type == DRM_MODE_CONNECTOR_HDMIA && strstr(mainProperty, "HDMI-A"))
+        || (connector_type == DRM_MODE_CONNECTOR_HDMIB && strstr(mainProperty, "HDMI-B"))
+        || (connector_type == DRM_MODE_CONNECTOR_TV && strstr(mainProperty, "TV"))
+        || (connector_type == DRM_MODE_CONNECTOR_VGA && strstr(mainProperty, "VGA"))
+        || (connector_type == DRM_MODE_CONNECTOR_DisplayPort && strstr(mainProperty, "DP"))
+        || (connector_type == DRM_MODE_CONNECTOR_eDP && strstr(mainProperty, "eDP"))
+        || (connector_type == DRM_MODE_CONNECTOR_VIRTUAL && strstr(mainProperty, "Virtual"))
+        || (connector_type == DRM_MODE_CONNECTOR_DSI && strstr(mainProperty, "DSI"))) {
+        info_v1 = &mBaseParameterInfos->main;
+        offset = 0;
+    } else {
+        info_v1 = &mBaseParameterInfos->aux;
+        offset = BASE_OFFSET;
+    }
+
+    memcpy(&info_v1->scan, overscan_info, sizeof(info_v1->scan));
+    lseek(file, offset, SEEK_SET);
+    write(file, (char*)(info_v1), sizeof(struct disp_info_v1));
+    close(file);
+    sync();
     return 0;
 }
 
