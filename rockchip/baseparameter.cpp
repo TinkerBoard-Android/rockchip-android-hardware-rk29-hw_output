@@ -205,6 +205,7 @@ int BaseParameterV1::set_disp_info(unsigned int connector_type, unsigned int con
         info_v1->hwc_info.framebuffer_width = info->framebuffer_info.framebuffer_width;
         info_v1->hwc_info.framebuffer_height = info->framebuffer_info.framebuffer_height;
         info_v1->hwc_info.fps = info->framebuffer_info.fps;
+        saveConfig();
     }
     return 0;
 }

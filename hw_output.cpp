@@ -363,6 +363,30 @@ static void hw_output_save_config(struct hw_output_device* dev){
         priv->mBaseParmeter->saveConfig();
 }
 
+static void updateScreeInfo(hw_output_private_t *priv) {
+    DrmConnector *primary = priv->drm_->GetConnectorFromType(HWC_DISPLAY_PRIMARY);
+    BaseParameter* mBaseParameter = priv->mBaseParmeter;
+    struct disp_info info;
+    int ret, slot;
+    if (primary) {
+        ret = mBaseParameter->get_disp_info(primary->get_type(), primary->connector_id(), &info);
+        slot = findSuitableInfoSlot(&info, primary->get_type(), primary->connector_id());
+        info.screen_info[slot].type = primary->get_type();
+        info.screen_info[slot].id = primary->connector_id();
+        ALOGE("primary updateScreeInfo type %d id %d ", info.screen_info[slot].type, info.screen_info[slot].id);
+        ret = mBaseParameter->set_disp_info(primary->get_type(), primary->connector_id(), &info);
+    }
+    DrmConnector *extend = priv->drm_->GetConnectorFromType(HWC_DISPLAY_EXTERNAL);
+    if(extend) {
+        mBaseParameter->get_disp_info(extend->get_type(), extend->connector_id(), &info);
+        slot = findSuitableInfoSlot(&info, extend->get_type(), extend->connector_id());
+        info.screen_info[slot].type = extend->get_type();
+        info.screen_info[slot].id = extend->connector_id();
+        ALOGE("extend updateScreeInfo type %d id %d ", info.screen_info[slot].type, info.screen_info[slot].id);
+        mBaseParameter->set_disp_info(extend->get_type(), extend->connector_id(), &info);
+    }
+}
+
 static void hw_output_hotplug_update(struct hw_output_device* dev){
     hw_output_private_t* priv = (hw_output_private_t*)dev;
 
@@ -444,7 +468,12 @@ static void hw_output_hotplug_update(struct hw_output_device* dev){
     priv->drm_->ClearDisplay();
 
     updateConnectors(priv);
-    hw_output_update_disp_header(dev);
+    if (mHwcVersion == 1) {
+        updateScreeInfo(priv);
+    } else if (mHwcVersion == 2) {
+        hw_output_update_disp_header(dev);
+        updateScreeInfo(priv);
+    }
 }
 
 static int hw_output_init_baseparameter(BaseParameter** mBaseParmeter)
